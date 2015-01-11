@@ -6,7 +6,7 @@ from sklearn.preprocessing import normalize
 STOCK_NUMBER = 490
 DEFAULT_ETA = 1
 DO_CORRELATIONS = False
-DO_FORWARD_CORRELATIONS = False
+DO_FORWARD_CORRELATIONS = True
 def normalized(v):
     return v/np.sum(v)
 
@@ -23,6 +23,8 @@ class StockAlgorithm:
         self.global_eta = DEFAULT_ETA
         self.stock_correlation = np.zeros((STOCK_NUMBER, STOCK_NUMBER), dtype = np.float64)
         self.forward_correlation = np.zeros((STOCK_NUMBER, STOCK_NUMBER), dtype = np.float64)
+        self.forward_correlation_sum = np.zeros((STOCK_NUMBER, STOCK_NUMBER), dtype = np.float64)
+        self.stock_correlation_sum = np.zeros((STOCK_NUMBER, STOCK_NUMBER), dtype = np.float64)
         self.stock_mean = np.zeros(STOCK_NUMBER, dtype = np.float64)
         self.stock_variance = np.zeros(STOCK_NUMBER, dtype = np.float64)
         self.stock_m2 = np.zeros(STOCK_NUMBER, dtype = np.float64)
@@ -32,6 +34,7 @@ class StockAlgorithm:
         self.point_count = 0
         self.prev_stock = None
         self.prev_stock_change = None
+
     def gradient_oracle(self, curr_stock, prev_stock):
         return np.divide(curr_stock, prev_stock)
 
@@ -55,45 +58,61 @@ class StockAlgorithm:
             x = normalized(x)
         return x
 
-    def update_stock_statistics(self, curr_stock):
+    def update_stock_statistics(self, curr_stock_change):
+
         if (DO_FORWARD_CORRELATIONS):
             for i in range(STOCK_NUMBER):
                 for j in range(STOCK_NUMBER):
-                    if (self.stock_variance[i] == 0 or self.stock_variance[j] == 0):
+                    if self.prev_stock_change == None:
                         self.forward_correlation[i, j] = 0
                     else:
-                        delta = self.forward_correlation[i, j] - (curr_stock[i] - self.stock_mean[i]) * (self.prev_stock[j] - self.stock_mean[j])/ ((self.stock_variance[i] * self.stock_variance[j]) ** 1/2)
-                        self.forward_correlation[i, j] = self.forward_correlation[i, j] + delta / (self.point_count - 1)
-                    #self.stock_correlation[j, i] = self.stock_correlation[i, j]
+                        if (self.prev_stock_change[j] == 1.0):
+                            if (curr_stock_change[i] == 1.0):
+                                delta = 1.0
+                            else:
+                                delta = 0
+                        else:
+                            delta = (1.0 - curr_stock_change[i]) / (1.0 - self.prev_stock_change[j])
+                        self.forward_correlation_sum[i, j] = self.forward_correlation_sum[i, j] + delta
+                        self.forward_correlation[i, j] = self.forward_correlation_sum[i, j] / (self.point_count - 1)
 
-        self.point_count = self.point_count + 1
         for i in range(STOCK_NUMBER):
-            delta = curr_stock[i] - self.stock_mean[i]
-            self.stock_mean[i] = self.stock_mean[i] + delta / self.point_count
+            delta = 1.0 - curr_stock_change[i]
             self.stock_m2[i] = self.stock_m2[i] + delta ** 2
             if (self.point_count < 2):
                self.stock_variance[i] = 0
             else:
               self.stock_variance[i] = self.stock_m2[i] / (self.point_count - 1)
-              self.volatility = np.divide(np.sqrt(self.stock_variance), self.stock_mean)
+              self.volatility = np.sqrt(self.stock_variance)
 
         if (DO_CORRELATIONS):
             for i in range(STOCK_NUMBER):
-                for j in range(i):
-                    if (self.stock_variance[i] == 0 or self.stock_variance[j] == 0):
+                for j in range(STOCK_NUMBER):
+                    if (self.point_count < 2):
                         self.stock_correlation[i, j] = 0
                     else:
-                        delta = self.stock_correlation[i, j] - (curr_stock[i] - self.stock_mean[i]) * (self.prev_stock[j] - self.stock_mean[j])/ ((self.stock_variance[i] * self.stock_variance[j]) ** 1/2)
-                        self.stock_correlation[i, j] = self.stock_correlation[i, j] + delta / (self.point_count - 1)
-                    self.stock_correlation[j, i] = self.stock_correlation[i, j]
-
+                        if (curr_stock_change[j] == 1.0):
+                            if (curr_stock_change[i] == 1.0):
+                                delta = 1.0
+                            else:
+                                delta = 0
+                        else:
+                            delta = (1.0 - curr_stock_change[i]) / (1.0 - curr_stock_change[j])
+                        self.stock_correlation_sum[i, j] = self.stock_correlation_sum[i, j] + delta
+                        self.stock_correlation[i, j] = self.stock_correlation_sum[i, j] / (self.point_count - 1)
+                    #self.stock_correlation[j, i] = self.stock_correlation[i, j]
 
         return
 
     def learn(self, curr_stock):
+        self.point_count = self.point_count + 1
         if (self.prev_stock != None):
             self.gradient = self.gradient_oracle(curr_stock, self.prev_stock)
-        self.update_stock_statistics(curr_stock)
+            curr_stock_change = np.divide(curr_stock, self.prev_stock)
+            self.update_stock_statistics(curr_stock_change)
+
+        if (self.prev_stock != None):
+            self.prev_stock_change = curr_stock_change
         self.prev_stock = curr_stock
         return
 
@@ -134,9 +153,8 @@ def main():
         stock_change_ratio = np.divide(curr_stock, prev_stock)
         money *= np.dot(money_distribution, stock_change_ratio)
         if (i % 100 == 0):
-            np.savetxt("volatility%d.csv" % i, decider.volatility, fmt='%.2f', delimiter=',')
-            np.savetxt("variation%d.csv" % i, decider.stock_variance, fmt='%.2f', delimiter=',')
-            np.savetxt("mean%d.csv" % i, decider.stock_mean, fmt='%.2f', delimiter=',')
+            np.savetxt("correlation%d.csv" % i, decider.stock_correlation, fmt='%.4f', delimiter=',')
+            np.savetxt("forward_correlation%d.csv" % i, decider.forward_correlation, fmt='%.4f', delimiter=',')
     print money
 
 if __name__ == "__main__":
