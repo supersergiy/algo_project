@@ -5,7 +5,7 @@ from sklearn.preprocessing import normalize
 
 STOCK_NUMBER = 490
 DEFAULT_ETA = 1
-
+DO_CORRELATIONS = True
 def normalized(v):
     return v/np.sum(v)
 
@@ -55,7 +55,7 @@ class StockAlgorithm:
         return x
 
     def update_stock_statistics(self, curr_stock):
-        curr_stocself.point_count = self.point_count + 1
+        self.point_count = self.point_count + 1
         for i in range(STOCK_NUMBER):
             delta = curr_stock[i] - self.stock_mean[i]
             self.stock_mean[i] = self.stock_mean[i] + delta / self.point_count
@@ -64,27 +64,27 @@ class StockAlgorithm:
                self.stock_variance[i] = 0
             else:
               self.stock_variance[i] = self.stock_m2[i] / (self.point_count - 1)
-
-        for i in range(STOCK_NUMBER):
-            for j in range(i):
-                if (self.stock_variance[i] == 0 or self.stock_variance[j] == 0):
-                    self.stock_correlation[i, j] = 0
-                else:
-                    delta = self.stock_correlation[i, j] - (curr_stock[i] - self.stock_mean[i]) * (curr_stock[j] - self.stock_mean[j])/ ((self.stock_variance[i] * self.stock_variance[j]) ** 1/2)
-                    self.stock_correlation[i, j] = self.stock_correlation[i, j] + delta / (self.point_count - 1)
-                self.stock_correlation[j, i] = self.stock_correlation[i, j]
+        if (DO_CORRELATIONS):
+            for i in range(STOCK_NUMBER):
+                for j in range(i):
+                    if (self.stock_variance[i] == 0 or self.stock_variance[j] == 0):
+                        self.stock_correlation[i, j] = 0
+                    else:
+                        delta = self.stock_correlation[i, j] - (curr_stock[i] - self.stock_mean[i]) * (curr_stock[j] - self.stock_mean[j])/ ((self.stock_variance[i] * self.stock_variance[j]) ** 1/2)
+                        self.stock_correlation[i, j] = self.stock_correlation[i, j] + delta / (self.point_count - 1)
+                    self.stock_correlation[j, i] = self.stock_correlation[i, j]
         return
 
     def learn(self, curr_stock):
         if (self.prev_stock != None):
             self.gradient = self.gradient_oracle(curr_stock, self.prev_stock)
-
+        self.update_stock_statistics(curr_stock)
+        self.prev_stock = curr_stock
         return
 
     def make_decision(self, curr_money_distribution):
         if self.point_count < 2:
             return self.default_distribution()
-
         return self.gradient_based_decision(curr_money_distribution)
 
     def gradient_based_decision(self, curr_money_distribution):
@@ -104,12 +104,13 @@ def main():
     stock_value = zip(*A)
 
     money = 1.0
-    money_distribution = normalized(np.ones(490))
+    money_distribution = None
 
     decider = StockAlgorithm()
     print "Starting simulation..."
     for i in xrange(1, 1000):
-        money_distribution = decider.make_decision(None)
+        print "Day ", i, ": ", money
+        money_distribution = decider.make_decision(money_distribution)
         curr_stock =  stock_value[i]
         prev_stock = stock_value[i - 1]
 
@@ -117,7 +118,8 @@ def main():
 
         stock_change_ratio = np.divide(curr_stock, prev_stock)
         money *= np.dot(money_distribution, stock_change_ratio)
-
+        if (i % 100 == 0):
+            np.savetxt("stock_correlations%d.csv" % i, decider.stock_correlation, fmt='%.2f', delimiter=',')
     print money
 
 if __name__ == "__main__":
