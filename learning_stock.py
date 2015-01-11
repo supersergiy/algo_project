@@ -22,16 +22,16 @@ class StockAlgorithm:
     def __init__(self):
         self.global_eta = DEFAULT_ETA
         self.stock_correlation = np.zeros((STOCK_NUMBER, STOCK_NUMBER), dtype = np.float64)
-        self.forward_correlation = np.zeros((STOCK_NUMBER, STOCK_NUMBER), dtype = np.float65)
+        self.forward_correlation = np.zeros((STOCK_NUMBER, STOCK_NUMBER), dtype = np.float64)
         self.stock_mean = np.zeros(STOCK_NUMBER, dtype = np.float64)
         self.stock_variance = np.zeros(STOCK_NUMBER, dtype = np.float64)
         self.stock_m2 = np.zeros(STOCK_NUMBER, dtype = np.float64)
         #todo: windowed statistics
-        #todo: statistics for normalized stock values
+        self.volatility = None
         self.gradient = None
         self.point_count = 0
         self.prev_stock = None
-
+        self.prev_stock_change = None
     def gradient_oracle(self, curr_stock, prev_stock):
         return np.divide(curr_stock, prev_stock)
 
@@ -75,6 +75,7 @@ class StockAlgorithm:
                self.stock_variance[i] = 0
             else:
               self.stock_variance[i] = self.stock_m2[i] / (self.point_count - 1)
+              self.volatility = np.divide(np.sqrt(self.stock_variance), self.stock_mean)
 
         if (DO_CORRELATIONS):
             for i in range(STOCK_NUMBER):
@@ -133,7 +134,9 @@ def main():
         stock_change_ratio = np.divide(curr_stock, prev_stock)
         money *= np.dot(money_distribution, stock_change_ratio)
         if (i % 100 == 0):
-            np.savetxt("future_correlations%d.csv" % i, decider.stock_correlation, fmt='%.2f', delimiter=',')
+            np.savetxt("volatility%d.csv" % i, decider.volatility, fmt='%.2f', delimiter=',')
+            np.savetxt("variation%d.csv" % i, decider.stock_variance, fmt='%.2f', delimiter=',')
+            np.savetxt("mean%d.csv" % i, decider.stock_mean, fmt='%.2f', delimiter=',')
     print money
 
 if __name__ == "__main__":
