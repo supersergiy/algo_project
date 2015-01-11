@@ -6,7 +6,7 @@ from sklearn.preprocessing import normalize
 STOCK_NUMBER = 490
 DEFAULT_ETA = 1
 DO_CORRELATIONS = False
-DO_FORWARD_CORRELATIONS = True
+DO_FORWARD_CORRELATIONS = False
 def normalized(v):
     return v/np.sum(v)
 
@@ -153,8 +153,9 @@ def main():
         stock_change_ratio = np.divide(curr_stock, prev_stock)
         money *= np.dot(money_distribution, stock_change_ratio)
         if (i % 100 == 0):
-            np.savetxt("correlation%d.csv" % i, decider.stock_correlation, fmt='%.4f', delimiter=',')
-            np.savetxt("forward_correlation%d.csv" % i, decider.forward_correlation, fmt='%.4f', delimiter=',')
+            #np.savetxt("correlation%d.csv" % i, decider.stock_correlation, fmt='%.4f', delimiter=',')
+            np.savetxt("volatility%d.csv" % i, decider.volatility, fmt='%.4f', delimiter=',')
+            #np.savetxt("forward_correlation%d.csv" % i, decider.forward_correlation, fmt='%.4f', delimiter=',')
     print money
 
 if __name__ == "__main__":
