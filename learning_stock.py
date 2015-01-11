@@ -5,7 +5,8 @@ from sklearn.preprocessing import normalize
 
 STOCK_NUMBER = 490
 DEFAULT_ETA = 1
-DO_CORRELATIONS = True
+DO_CORRELATIONS = False
+DO_FORWARD_CORRELATIONS = False
 def normalized(v):
     return v/np.sum(v)
 
@@ -20,11 +21,11 @@ def partial_sum(y, j):
 class StockAlgorithm:
     def __init__(self):
         self.global_eta = DEFAULT_ETA
-        self.stock_correlation = np.zeros((STOCK_NUMBER, STOCK_NUMBER), dtype = np.float64)#todo
-        self.stock_volatility = np.zeros(STOCK_NUMBER, dtype = np.float64)#todo
-        self.stock_mean = np.zeros(STOCK_NUMBER, dtype = np.float64)#done
-        self.stock_variance = np.zeros(STOCK_NUMBER, dtype = np.float64)#done
-        self.stock_m2 = np.zeros(STOCK_NUMBER, dtype = np.float64)#done
+        self.stock_correlation = np.zeros((STOCK_NUMBER, STOCK_NUMBER), dtype = np.float64)
+        self.forward_correlation = np.zeros((STOCK_NUMBER, STOCK_NUMBER), dtype = np.float65)
+        self.stock_mean = np.zeros(STOCK_NUMBER, dtype = np.float64)
+        self.stock_variance = np.zeros(STOCK_NUMBER, dtype = np.float64)
+        self.stock_m2 = np.zeros(STOCK_NUMBER, dtype = np.float64)
         #todo: windowed statistics
         #todo: statistics for normalized stock values
         self.gradient = None
@@ -55,6 +56,16 @@ class StockAlgorithm:
         return x
 
     def update_stock_statistics(self, curr_stock):
+        if (DO_FORWARD_CORRELATIONS):
+            for i in range(STOCK_NUMBER):
+                for j in range(STOCK_NUMBER):
+                    if (self.stock_variance[i] == 0 or self.stock_variance[j] == 0):
+                        self.forward_correlation[i, j] = 0
+                    else:
+                        delta = self.forward_correlation[i, j] - (curr_stock[i] - self.stock_mean[i]) * (self.prev_stock[j] - self.stock_mean[j])/ ((self.stock_variance[i] * self.stock_variance[j]) ** 1/2)
+                        self.forward_correlation[i, j] = self.forward_correlation[i, j] + delta / (self.point_count - 1)
+                    #self.stock_correlation[j, i] = self.stock_correlation[i, j]
+
         self.point_count = self.point_count + 1
         for i in range(STOCK_NUMBER):
             delta = curr_stock[i] - self.stock_mean[i]
@@ -64,15 +75,18 @@ class StockAlgorithm:
                self.stock_variance[i] = 0
             else:
               self.stock_variance[i] = self.stock_m2[i] / (self.point_count - 1)
+
         if (DO_CORRELATIONS):
             for i in range(STOCK_NUMBER):
                 for j in range(i):
                     if (self.stock_variance[i] == 0 or self.stock_variance[j] == 0):
                         self.stock_correlation[i, j] = 0
                     else:
-                        delta = self.stock_correlation[i, j] - (curr_stock[i] - self.stock_mean[i]) * (curr_stock[j] - self.stock_mean[j])/ ((self.stock_variance[i] * self.stock_variance[j]) ** 1/2)
+                        delta = self.stock_correlation[i, j] - (curr_stock[i] - self.stock_mean[i]) * (self.prev_stock[j] - self.stock_mean[j])/ ((self.stock_variance[i] * self.stock_variance[j]) ** 1/2)
                         self.stock_correlation[i, j] = self.stock_correlation[i, j] + delta / (self.point_count - 1)
                     self.stock_correlation[j, i] = self.stock_correlation[i, j]
+
+
         return
 
     def learn(self, curr_stock):
@@ -119,7 +133,7 @@ def main():
         stock_change_ratio = np.divide(curr_stock, prev_stock)
         money *= np.dot(money_distribution, stock_change_ratio)
         if (i % 100 == 0):
-            np.savetxt("stock_correlations%d.csv" % i, decider.stock_correlation, fmt='%.2f', delimiter=',')
+            np.savetxt("future_correlations%d.csv" % i, decider.stock_correlation, fmt='%.2f', delimiter=',')
     print money
 
 if __name__ == "__main__":
