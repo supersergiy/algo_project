@@ -76,7 +76,6 @@ class StockAlgorithm:
         return
 
     def learn(self, curr_stock):
-
         if (self.prev_stock != None):
             self.gradient = self.gradient_oracle(curr_stock, self.prev_stock)
 
@@ -110,6 +109,7 @@ def main():
     decider = StockAlgorithm()
     print "Starting simulation..."
     for i in xrange(1, 1000):
+        money_distribution = decider.make_decision(None)
         curr_stock =  stock_value[i]
         prev_stock = stock_value[i - 1]
 
@@ -117,8 +117,6 @@ def main():
 
         stock_change_ratio = np.divide(curr_stock, prev_stock)
         money *= np.dot(money_distribution, stock_change_ratio)
-
-        money_distribution = decider.make_decision(money_distribution)
 
     print money
 
