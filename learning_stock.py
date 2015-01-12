@@ -3,6 +3,10 @@ import math
 import random
 import scipy.io
 
+VOLATILITY = 0
+GRADIENT = 1
+PREV_CHANGE = 2
+
 STOCK_NUMBER = 490
 DEFAULT_ETA = 1
 DIAMETER = math.sqrt(2)
@@ -37,6 +41,7 @@ class StockAlgorithm:
         self.point_count = 0
         self.prev_stock = None
         self.prev_stock_change = None
+        self.algos = [self.volatility_based_decision, self.gradient_based_decision, self.prev_change_based_decision]
 
     def gradient_oracle(self, curr_stock, prev_stock):
         return np.divide(curr_stock, prev_stock)
@@ -119,21 +124,25 @@ class StockAlgorithm:
         self.prev_stock = curr_stock
         return
 
-    def make_decision(self, curr_money_distribution):
+    def make_decision(self, curr_money_distribution, algo):
         if self.point_count < 2:
             return self.default_distribution()
-        return self.gradient_based_decision(curr_money_distribution)
+        return self.algos[algo](curr_money_distribution)
 
     def gradient_based_decision(self, curr_money_distribution):
         new_distribution = np.add(curr_money_distribution, self.global_eta * self.gradient)
         return self.projection_oracle(new_distribution)
 
     def volatility_based_decision(self, curr_money_distribution):
-        #self.individual_eta = 10000*normalized(np.subtract(np.ones(490), self.volatility))
-        self.individual_eta = 490*normalized(self.volatility)
+        self.individual_eta = 4900000 * normalized(self.volatility)
         new_distribution = np.add(curr_money_distribution, np.multiply(self.individual_eta, self.gradient))
         return self.projection_oracle(new_distribution)
 
+    def prev_change_based_decision(self, curr_money_distribution):
+        self.individual_eta = 4900000 * normalized(np.subtract(np.ones(STOCK_NUMBER), self.prev_stock_change))
+        new_distribution = np.add(curr_money_distribution, np.multiply(self.individual_eta, self.gradient))
+
+        return self.projection_oracle(new_distribution)
     def default_distribution(self):
         result = np.ones(STOCK_NUMBER)
         return normalized(result)
@@ -151,22 +160,29 @@ def main():
 
     decider = StockAlgorithm()
     print "Starting simulation..."
-    for i in xrange(1, 800):
-        #print "Day ", i, ": ", money
-        money_distribution = decider.make_decision(money_distribution)
-        curr_stock =  stock_value[i]
-        prev_stock = stock_value[i - 1]
+    used_algos = [0, 1, 2]
+    for algo in used_algos:
+        money = 1.0
+        print "algo: ", algo
+        for i in xrange(1, 1000):
+            #print "Day ", i, ": ", money
+            money_distribution = decider.make_decision(money_distribution, algo)
+            curr_stock =  stock_value[i]
+            prev_stock = stock_value[i - 1]
 
-        decider.learn(curr_stock)
+            decider.learn(curr_stock)
 
-        stock_change_ratio = np.divide(curr_stock, prev_stock)
-        money *= np.dot(money_distribution, stock_change_ratio)
-        if (i % 100 == 0):
-            continue
-            #np.savetxt("correlation%d.csv" % i, decider.stock_correlation, fmt='%.4f', delimiter=',')
-            #np.savetxt("volatility%d.csv" % i, decider.volatility, fmt='%.4f', delimiter=',')
-            #np.savetxt("forward_correlation%d.csv" % i, decider.forward_correlation, fmt='%.4f', delimiter=',')
-    print money
+            stock_change_ratio = np.divide(curr_stock, prev_stock)
+            money *= np.dot(money_distribution, stock_change_ratio)
+            if (i == 800):
+                print "800 money: ", money
+            if (i % 100 == 0):
+                continue
+                #np.savetxt("correlation%d.csv" % i, decider.stock_correlation, fmt='%.4f', delimiter=',')
+                #np.savetxt("volatility%d.csv" % i, decider.volatility, fmt='%.4f', delimiter=',')
+                #np.savetxt("forward_correlation%d.csv" % i, decider.forward_correlation, fmt='%.4f', delimiter=',')
+        decider.clear()
+        print "1000 money: ", money
 
 
 if __name__ == "__main__":
