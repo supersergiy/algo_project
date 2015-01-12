@@ -1,10 +1,12 @@
 import numpy as np
+import math
 import random
 import scipy.io
-from sklearn.preprocessing import normalize
 
 STOCK_NUMBER = 490
 DEFAULT_ETA = 1
+DIAMETER = math.sqrt(2)
+TIME_STEPS = 1000
 DO_CORRELATIONS = False
 DO_FORWARD_CORRELATIONS = False
 def normalized(v):
@@ -21,6 +23,7 @@ def partial_sum(y, j):
 class StockAlgorithm:
     def __init__(self):
         self.global_eta = DEFAULT_ETA
+        self.individual_eta = None
         self.stock_correlation = np.zeros((STOCK_NUMBER, STOCK_NUMBER), dtype = np.float64)
         self.forward_correlation = np.zeros((STOCK_NUMBER, STOCK_NUMBER), dtype = np.float64)
         self.forward_correlation_sum = np.zeros((STOCK_NUMBER, STOCK_NUMBER), dtype = np.float64)
@@ -125,6 +128,12 @@ class StockAlgorithm:
         new_distribution = np.add(curr_money_distribution, self.global_eta * self.gradient)
         return self.projection_oracle(new_distribution)
 
+    def volatility_based_decision(self, curr_money_distribution):
+        #self.individual_eta = 10000*normalized(np.subtract(np.ones(490), self.volatility))
+        self.individual_eta = 490*normalized(self.volatility)
+        new_distribution = np.add(curr_money_distribution, np.multiply(self.individual_eta, self.gradient))
+        return self.projection_oracle(new_distribution)
+
     def default_distribution(self):
         result = np.ones(STOCK_NUMBER)
         return normalized(result)
@@ -142,8 +151,8 @@ def main():
 
     decider = StockAlgorithm()
     print "Starting simulation..."
-    for i in xrange(1, 1000):
-        print "Day ", i, ": ", money
+    for i in xrange(1, 800):
+        #print "Day ", i, ": ", money
         money_distribution = decider.make_decision(money_distribution)
         curr_stock =  stock_value[i]
         prev_stock = stock_value[i - 1]
@@ -153,10 +162,12 @@ def main():
         stock_change_ratio = np.divide(curr_stock, prev_stock)
         money *= np.dot(money_distribution, stock_change_ratio)
         if (i % 100 == 0):
+            continue
             #np.savetxt("correlation%d.csv" % i, decider.stock_correlation, fmt='%.4f', delimiter=',')
-            np.savetxt("volatility%d.csv" % i, decider.volatility, fmt='%.4f', delimiter=',')
+            #np.savetxt("volatility%d.csv" % i, decider.volatility, fmt='%.4f', delimiter=',')
             #np.savetxt("forward_correlation%d.csv" % i, decider.forward_correlation, fmt='%.4f', delimiter=',')
     print money
+
 
 if __name__ == "__main__":
         main()
